@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PGDG & Co. Gacha</title>
+  <style>
+    :root {
+      --bg: #121217;
+      --surface: #1e1e26;
+      --text: #f0f0f5;
+      --common: #a3a3a3;
+      --uncommon: #82b366;
+      --rare: #6c8ebf;
+      --epic: #9673a6;
+      --legendary: #d6b656;
+      --mythic: #ea6b66;
+    }
+
+    * { box-sizing: border-box; font-family: system-ui, -apple-system, sans-serif; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      margin: 0;
+      padding: 2rem 1rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    h1, h2 { margin-top: 0; }
+    .container { max-width: 800px; width: 100%; }
+
+    /* Pack Pull Section */
+    .pull-zone {
+      background: var(--surface);
+      padding: 2rem;
+      border-radius: 12px;
+      text-align: center;
+      margin-bottom: 2rem;
+      border: 1px solid #2e2e3a;
+    }
+
+    button {
+      background: #4f46e5;
+      color: white;
+      border: none;
+      padding: 0.85rem 1.75rem;
+      font-size: 1.1rem;
+      font-weight: bold;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: transform 0.1s, opacity 0.2s;
+    }
+    button:hover:not(:disabled) { transform: scale(1.03); }
+    button:disabled { background: #3f3f4e; cursor: not-allowed; opacity: 0.7; }
+
+    .pack-display {
+      display: flex;
+      justify-content: center;
+      gap: 1.25rem;
+      flex-wrap: wrap;
+      margin-top: 1.5rem;
+      min-height: 250px;
+    }
+
+    /* Card Styling & Rarity Borders */
+    .card {
+      width: 180px;
+      height: 255px;
+      background: #252530;
+      border-radius: 10px;
+      padding: 0.85rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      align-items: center;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+      border: 3px solid var(--common);
+      box-shadow: 0 6px 16px rgba(0,0,0,0.4);
+      animation: popIn 0.35s ease-out forwards;
+    }
+
+    @keyframes popIn {
+      0% { transform: scale(0.8) translateY(15px); opacity: 0; }
+      100% { transform: scale(1) translateY(0); opacity: 1; }
+    }
+
+    .rarity-Common { border-color: var(--common); }
+    .rarity-Uncommon { border-color: var(--uncommon); }
+    .rarity-Rare { border-color: var(--rare); }
+    .rarity-Epic { border-color: var(--epic); }
+    .rarity-Legendary { border-color: var(--legendary); box-shadow: 0 0 15px rgba(214, 182, 86, 0.4); }
+    .rarity-Mythic { border-color: var(--mythic); box-shadow: 0 0 20px rgba(234, 107, 102, 0.6); }
+
+    .card-rarity { font-size: 0.75rem; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; }
+    
+    .card-img {
+      width: 105px;
+      height: 105px;
+      object-fit: cover;
+      border-radius: 50%;
+      border: 2px solid rgba(255, 255, 255, 0.15);
+      background: #14141a;
+    }
+
+    .card-name { font-size: 1.15rem; font-weight: 700; word-break: break-word; }
+    .card-mod { font-size: 0.75rem; font-weight: bold; padding: 3px 8px; border-radius: 4px; background: rgba(0,0,0,0.45); }
+
+    /* Modifiers */
+    .mod-Holo::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(125deg, rgba(255,0,0,0.18), rgba(0,255,0,0.18), rgba(0,0,255,0.18));
+      mix-blend-mode: color-dodge;
+      pointer-events: none;
+    }
+    .mod-Foil {
+      background: linear-gradient(135deg, #2a2a38 0%, #484860 50%, #2a2a38 100%);
+    }
+    .mod-Shiny {
+      box-shadow: 0 0 25px #fff, inset 0 0 15px rgba(255, 223, 100, 0.6);
+    }
+
+    /* Collection Panel */
+    .panel {
+      background: var(--surface);
+      padding: 1.5rem;
+      border-radius: 12px;
+      border: 1px solid #2e2e3a;
+    }
+
+    ul { list-style: none; padding: 0; margin: 0; max-height: 300px; overflow-y: auto; }
+    li {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.6rem;
+      border-bottom: 1px solid #2a2a35;
+      font-size: 0.95rem;
+    }
+    .del-btn {
+      background: #dc2626;
+      padding: 0.3rem 0.65rem;
+      font-size: 0.8rem;
+    }
+
+    /* Modal Popup */
+    .modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.8);
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+      padding: 1rem;
+    }
+    .modal.active { display: flex; }
+    .modal-content {
+      background: var(--surface);
+      padding: 2.5rem 2rem 2rem 2rem;
+      border-radius: 14px;
+      border: 1px solid #3f3f4e;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1rem;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+      animation: popIn 0.25s ease-out;
+    }
+    .close-btn {
+      position: absolute;
+      top: 10px;
+      right: 15px;
+      font-size: 1.5rem;
+      cursor: pointer;
+      color: #aaa;
+      background: none;
+      border: none;
+      padding: 0;
+    }
+    .close-btn:hover { color: #fff; transform: none; }
+    .modal-count { font-size: 0.9rem; color: #a3a3a3; font-weight: 600; }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <h1>PGDG & Co. Gacha</h1>
+
+  <!-- Pull Section -->
+  <div class="pull-zone">
+    <button id="pullBtn" onclick="openPack()">Open Pack (3 Cards)</button>
+    <p id="timerText" style="color: #a3a3a3; margin-top: 0.75rem;">Ready to pull!</p>
+    <div class="pack-display" id="packDisplay"></div>
+  </div>
+
+  <!-- Inventory / Collection -->
+  <div class="panel">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 0.5rem;">
+      <h2>Your Collection</h2>
+      <button onclick="clearCollection()" class="del-btn">Reset Collection</button>
+    </div>
+    <ul id="collectionList"></ul>
+  </div>
+
+  <!-- Modal Popup for Card Preview -->
+<div id="cardModal" class="modal" onclick="closeModal()">
+  <div class="modal-content" onclick="event.stopPropagation()">
+    <button class="close-btn" onclick="closeModal()">&times;</button>
+    <div id="modalCardSlot"></div>
+    <div id="modalCardCount" class="modal-count"></div>
+  </div>
+</div>
+<br>
+<h2>created by xbladexgmd with help from google gemini</h2>
+</div>
+
+<script>
+  // =========================================================================
+  // card pool
+  // =========================================================================
+  const CARD_POOL = {
+    Common: [
+      { name: "Aceckerty", image: "images/ace.webp" },
+      { name: "akarachai", image: "images/akarachai.webp" },
+      { name: "Helvetica", image: "images/helvetica.webp" },
+      { name: "twinkierat", image: "images/twinkierat.webp" },
+      { name: "Wys", image: "images/wys.webp" },
+      { name: "Remsey", image: "images/remsey.webp" },
+      { name: "breeze_dragon", image: "images/breeze_dragon.webp" },
+      { name: "OMINOUS CHINESE MAN", image: "images/ominouschineseman.webp" },
+      { name: "Rilso", image: "images/rilso.webp" },
+      { name: "Kotovskyu", image: "images/kotovskyu.webp" },
+      { name: "ghostpeppergd", image: "images/ghostpepper.webp" },
+      { name: "Afumaii", image: "images/afumaii.webp" },
+      { name: "7w7y", image: "images/7w7y.webp" },
+      { name: "Tuoyu", image: "images/tuoyu.webp" },
+      { name: "groundsprite", image: "images/groundsprite.webp" },
+      { name: "Emblem32", image: "images/emblem.webp" },
+      { name: "Isabella", image: "images/isabella.webp" },
+      { name: "IntelEdits", image: "images/inteledits.webp" },
+      { name: "Sylvie", image: "images/sylvie.webp" },
+      { name: "Vanessa", image: "images/vanessa.webp" },
+      { name: "toast", image: "images/toast.webp" },
+      { name: "Zirk", image: "images/zirk.webp" },
+      { name: "SILVER062", image: "images/silver.webp" },
+      { name: "Emerald1", image: "images/emerald1.webp" },
+      { name: "Kaito (that1blade)", image: "images/kaito.webp" },
+      { name: "Blake Tonotia", image: "images/bt.webp" },
+      { name: "Asteria", image: "images/asteria.webp" },
+      { name: "silverra", image: "images/silverra.webp" },
+      { name: "Daruck", image: "images/daruck.webp" },
+      { name: "StarXV", image: "images/starxv.webp" },
+      { name: "Wencheng Cai", image: "images/wenchengcai.png" },
+      { name: "Unlimiter", image: "images/unlimiter.webp" }
+    ],
+    Uncommon: [
+      { name: "bggfieldball", image: "images/bgg.webp" },
+      { name: "Astral", image: "images/astral.webp" },
+      { name: "Hazel", image: "images/hazel.webp" },
+      { name: "Pancake", image: "images/pancake.webp" },
+      { name: "Smek", image: "images/smek.webp" },
+      { name: "Enanan", image: "images/ena.webp" },
+      { name: "Melody", image: "images/melody.webp" },
+      { name: "Low Taper Dash", image: "images/lowtaperdash.webp" },
+      { name: "sharkified", image: "images/sharkified.webp" },
+      { name: "Aquadew", image: "images/aquadew.webp" },
+      { name: "Alice", image: "images/alice.webp" },
+      { name: "LifelessComputer", image: "images/lifelesscomputer.webp" },
+      { name: "Bishop", image: "images/bishop.webp" },
+      { name: "Royal", image: "images/royal.webp" },
+      { name: "Blaster", image: "images/blaster.webp" },
+      { name: "latenightpiss", image: "images/latenightpiss.webp" },
+      { name: "Latios", image: "images/latios.webp" },
+      { name: "JJ (smierdzacy)", image: "images/jj.webp" }
+    ],
+    Rare: [
+      { name: "Juni", image: "images/juni.webp" },
+      { name: "MirageVision", image: "images/mirage.webp" },
+      { name: "Therapist", image: "images/therapist.webp" },
+      { name: "Wigby", image: "images/wigby.webp" },
+      { name: "Amelia", image: "images/amelia.webp" },
+      { name: "Lani", image: "images/lani.webp" },
+      { name: "Matthijsgd", image: "images/matthijsgd.webp" },
+      { name: "Li Mao", image: "images/li mao.webp" },
+      { name: "Fuze", image: "images/fuze.webp" },
+      { name: "Kookyeyes", image: "images/kookyeyes.webp" },
+      { name: "Miiskiki", image: "images/miiskiki.webp" },
+      { name: "ShowMeBob", image: "images/billy.webp" }
+    ],
+    Epic: [
+      { name: "RoniPizza (Normadic)", image: "images/ronipizza.webp" },
+      { name: "vapid", image: "images/vapid.webp" },
+      { name: "Clubstep94", image: "images/clubstep94.webp" },
+      { name: "goomygnome", image: "images/goomygnome.webp" },
+      { name: "wistfully", image: "images/wistfully.webp" },
+      { name: "Game Master", image: "images/gamemaster.webp" },
+      { name: "Rat", image: "images/rat.webp" },
+      { name: "God", image: "images/god.webp" },
+      { name: "Nug", image: "images/nug.webp" },
+      { name: "Superomarking", image: "images/supero.webp" },
+      { name: "youngs", image: "images/tuoyu.webp" },
+      { name: "Lyth (Deep)", image: "images/lyth.webp" }
+    ],
+    Legendary: [
+      { name: "JohnnyWhatttt (Aqua)", image: "images/johnny.webp" },
+      { name: "riverkiwi", image: "images/riverkiwi.webp" },
+      { name: "Cheesy (manulseal)", image: "images/cheesy.webp" },
+      { name: "voicechatping", image: "images/voice.webp" },
+      { name: "YeckGrinding", image: "images/yeck.webp" },
+      { name: "Xplode09", image: "images/xplode.webp" }
+    ],
+    Mythic: [
+      { name: "Akuriserv (Rin)", image: "images/rin.webp" },
+      { name: "cinder__block", image: "images/cinder.webp" },
+      { name: "Cosmic", image: "images/cosmic.webp" },
+      { name: "EvilEmperium", image: "images/evil.webp" },
+      { name: "HamsterPlayz", image: "images/hamster.webp" },
+      { name: "Lilgig", image: "images/lilgig.webp" },
+      { name: "Llqne", image: "images/llqne.webp" },
+      { name: "Albert", image: "images/albert.webp" },
+      { name: "XBladeXGMD (aziya)", image: "images/aziya.jfif" },
+      { name: "ShadowAxeKid", image: "images/shadow.webp" },
+      { name: "Brapstu", image: "images/brapstu.webp" },
+      { name: "Pixelo", image: "images/pixelo.webp" }
+    ]
+  };
+  // =========================================================================
+
+  // 1. Exact Rarity Rates
+  const RARITIES = [
+    { name: "Mythic", chance: 0.075 },
+    { name: "Legendary", chance: 0.3 },
+    { name: "Epic", chance: 1.7 },
+    { name: "Rare", chance: 7.5 },
+    { name: "Uncommon", chance: 15.0 },
+    { name: "Common", chance: 75.425 }
+  ];
+
+  // 2. Exact Modifier Rates
+  const MODIFIERS = [
+    { name: "Shiny", chance: 1 / 1000 },
+    { name: "Foil", chance: 1 / 100 },
+    { name: "Holo", chance: 1 / 20 }
+  ];
+
+  const COOLDOWN_MS = 2 * 60 * 1000; // 2 minutes
+  const FALLBACK_IMG = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100'><rect width='100' height='100' fill='%2314141a'/><text x='50%' y='55%' font-size='40' text-anchor='middle' fill='%23555'>?</text></svg>";
+
+  let collection = JSON.parse(localStorage.getItem("gacha_collection")) || {};
+  let lastPullTime = parseInt(localStorage.getItem("gacha_last_pull")) || 0;
+
+  function saveState() {
+    localStorage.setItem("gacha_collection", JSON.stringify(collection));
+    localStorage.setItem("gacha_last_pull", lastPullTime.toString());
+  }
+
+  function rollRarity() {
+    const roll = Math.random() * 100;
+    let cumulative = 0;
+    for (const r of RARITIES) {
+      cumulative += r.chance;
+      if (roll < cumulative) return r.name;
+    }
+    return "Common";
+  }
+
+  function rollModifier() {
+    for (const mod of MODIFIERS) {
+      if (Math.random() < mod.chance) return mod.name;
+    }
+    return "Standard";
+  }
+
+  function getAllCardsFallback() {
+    return Object.entries(CARD_POOL).flatMap(([rarity, people]) =>
+      people.map(person => ({ ...person, rarity }))
+    );
+  }
+
+  function openPack() {
+    if (Date.now() - lastPullTime < COOLDOWN_MS) return;
+
+    const allCards = getAllCardsFallback();
+    if (allCards.length === 0) {
+      alert("No cards have been configured in CARD_POOL yet!");
+      return;
+    }
+
+    lastPullTime = Date.now();
+    const display = document.getElementById("packDisplay");
+    display.innerHTML = "";
+
+    for (let i = 0; i < 3; i++) {
+      let chosenRarity = rollRarity();
+      let candidates = (CARD_POOL[chosenRarity] || []).map(p => ({ ...p, rarity: chosenRarity }));
+
+      // Fallback if a rarity category is left empty
+      if (candidates.length === 0) {
+        candidates = allCards;
+      }
+
+      const person = candidates[Math.floor(Math.random() * candidates.length)];
+      const modifier = rollModifier();
+
+      // Save to user's local collection
+      const cardKey = `${person.name} [${person.rarity}] (${modifier})`;
+      collection[cardKey] = (collection[cardKey] || 0) + 1;
+
+      // Render card
+      const cardEl = document.createElement("div");
+      cardEl.className = `card rarity-${person.rarity} mod-${modifier}`;
+      cardEl.innerHTML = `
+        <div class="card-rarity" style="color: var(--${person.rarity.toLowerCase()})">${person.rarity}</div>
+        <img class="card-img" src="${person.image}" onerror="this.src='${FALLBACK_IMG}'" alt="${person.name}" />
+        <div class="card-name">${person.name}</div>
+        <div class="card-mod">${modifier === "Standard" ? "Normal" : "✨ " + modifier}</div>
+      `;
+      display.appendChild(cardEl);
+    }
+
+    saveState();
+    renderCollection();
+    updateTimer();
+  }
+
+  function clearCollection() {
+    if (confirm("Clear your entire pulled card collection?")) {
+      collection = {};
+      saveState();
+      renderCollection();
+    }
+  }
+
+  function renderCollection() {
+    const list = document.getElementById("collectionList");
+    list.innerHTML = "";
+    const entries = Object.entries(collection);
+    if (entries.length === 0) {
+      list.innerHTML = `<li style="color:#777;">No cards pulled yet.</li>`;
+      return;
+    }
+    entries.forEach(([cardName, count]) => {
+      const li = document.createElement("li");
+      li.innerHTML = `<span>${cardName}</span> <strong>x${count}</strong>`;
+      list.appendChild(li);
+    });
+  }
+
+  function updateTimer() {
+    const btn = document.getElementById("pullBtn");
+    const timerText = document.getElementById("timerText");
+    const elapsed = Date.now() - lastPullTime;
+
+    if (elapsed >= COOLDOWN_MS) {
+      btn.disabled = false;
+      timerText.textContent = "Pack ready!";
+    } else {
+      btn.disabled = true;
+      const remaining = Math.ceil((COOLDOWN_MS - elapsed) / 1000);
+      const mins = Math.floor(remaining / 60);
+      const secs = (remaining % 60).toString().padStart(2, "0");
+      timerText.textContent = `Next pack available in ${mins}:${secs}`;
+    }
+  }
+
+  // Initialize
+  renderCollection();
+  updateTimer();
+  setInterval(updateTimer, 1000);
+
+  function renderCollection() {
+    const list = document.getElementById("collectionList");
+    list.innerHTML = "";
+    const entries = Object.entries(collection);
+    
+    if (entries.length === 0) {
+      list.innerHTML = `<li style="color:#777; cursor:default;">No cards pulled yet.</li>`;
+      return;
+    }
+
+    entries.forEach(([cardKey, count]) => {
+      // Parse cardKey back into name, rarity, modifier
+      const match = cardKey.match(/^(.+?)\s+\[(.+?)\]\s+\((.+?)\)$/);
+      if (!match) return;
+      const [, name, rarity, modifier] = match;
+
+      const li = document.createElement("li");
+      li.innerHTML = `<span>${cardKey}</span> <strong>x${count}</strong>`;
+      // 👉 This makes each collection row clickable:
+      li.onclick = () => showCardModal(name, rarity, modifier, count);
+      list.appendChild(li);
+    });
+  }
+
+  function showCardModal(name, rarity, modifier, count) {
+    // Find image URL from CARD_POOL
+    let imageUrl = "https://via.placeholder.com/150";
+    if (CARD_POOL[rarity]) {
+      const found = CARD_POOL[rarity].find(p => p.name === name);
+      if (found) imageUrl = found.image;
+    }
+
+    const modalSlot = document.getElementById("modalCardSlot");
+    modalSlot.innerHTML = "";
+    modalSlot.appendChild(createCardElement(name, rarity, modifier, imageUrl));
+
+    document.getElementById("modalCardCount").textContent = `You own: ${count} copy${count > 1 ? 's' : ''}`;
+    document.getElementById("cardModal").classList.add("active");
+  }
+
+  function closeModal() {
+    document.getElementById("cardModal").classList.remove("active");
+  }
+</script>
+</body>
+</html>
