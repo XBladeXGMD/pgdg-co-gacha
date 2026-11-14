@@ -233,6 +233,53 @@
       border-color: #4f46e5;
     }
 
+    /* Locked Shop Tab styling */
+    .tab-btn.locked {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+
+    /* Shop Item Card */
+    .shop-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 1rem;
+      background: #252530;
+      border: 1px solid #3f3f4e;
+      padding: 1.25rem;
+      border-radius: 10px;
+    }
+
+    .shop-item-info h3 {
+      margin: 0 0 0.35rem 0;
+      font-size: 1.15rem;
+    }
+
+    .shop-item-info p {
+      margin: 0;
+      color: #a3a3a3;
+      font-size: 0.9rem;
+    }
+
+    .buy-btn {
+      background: #eab308;
+      color: #121217;
+      padding: 0.65rem 1.25rem;
+      font-size: 0.95rem;
+      font-weight: 800;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+    }
+
+    .buy-btn:disabled {
+      background: #3f3f4e;
+      color: #888;
+      cursor: not-allowed;
+    }
+
     /* Collection Panel & Controls */
     .panel {
       background: var(--surface);
@@ -397,6 +444,7 @@
     <button id="btn-tab-collection" class="tab-btn" onclick="switchTab('collection')">
       📚 Collection (<span id="tabTotalCards">0</span>)
     </button>
+    <button id="btn-tab-shop" class="tab-btn locked" onclick="switchTab('shop')">🔒 Shop (Lvl 15)</button>
   </div>
 
   <!-- TAB 1: Pack Opener -->
@@ -405,7 +453,7 @@
       <div class="status-bar">
         <div class="coin-badge">🪙 Coins: <span id="coinCount">0</span></div>
         <div class="xp-badge">⭐ XP: <span id="xpCount">0</span></div>
-        <div class="queue-badge">📦 Packs: <span id="packCount">0</span> / 5</div>
+        <div class="queue-badge">📦 Packs: <span id="packCount">0</span> / <span id="maxPackCount">3</span></div>
       </div>
 
       <button id="pullBtn" onclick="openPack()">Open Pack (3 Cards)</button>
@@ -447,6 +495,29 @@
     </div>
   </div>
 </div>
+
+<!-- TAB 3: Shop -->
+  <div id="tab-shop" style="display: none;">
+    <div class="panel">
+      <div class="collection-header">
+        <div>
+          <h2 style="margin-bottom: 0.2rem;">Upgrades</h2>
+          <span style="font-size: 0.9rem; color: #ffd966;">
+            Your Balance: <strong id="shopCoinBalance">0</strong> Coins
+          </span>
+        </div>
+      </div>
+
+      <!-- Pack Slot Upgrade Item -->
+      <div class="shop-item">
+        <div class="shop-item-info">
+          <h3>📦 Extra Pack Queue Slot</h3>
+          <p id="slotUpgradeDesc">Increase your max queued packs from 3 to 4.</p>
+        </div>
+        <button id="buySlotBtn" class="buy-btn" onclick="buyPackSlot()">Buy (1,000 Coins)</button>
+      </div>
+    </div>
+  </div>
 
   <!-- Modal Popup for Card Preview -->
 <div id="cardModal" class="modal" onclick="closeModal()">
@@ -596,8 +667,8 @@
 
   // 2. Exact Modifier Rates
   const MODIFIERS = [
-    { name: "Shiny", chance: 1 / 1000 },
-    { name: "Foil", chance: 1 / 100 },
+    { name: "Shiny", chance: 1 / 1024 },
+    { name: "Foil", chance: 1 / 128 },
     { name: "Holo", chance: 1 / 20 }
   ];
 
@@ -619,10 +690,26 @@
     Shiny: 8
   };
 
-  // [NEW JS] Pack Queue settings (max 5 packs, 1 new pack every 2 minutes)
-  const MAX_PACKS = 5;
+  // Pack Queue settings (starts at 3 slots, upgradable up to 10 in Shop)
+  const BASE_MAX_PACKS = 3;
+  const ABSOLUTE_MAX_PACKS = 10;
+  const SHOP_UNLOCK_LEVEL = 15;
+
+  // Exact coin cost to unlock each respective slot (4 through 10)
+  const SLOT_COSTS = {
+    4: 1000,
+    5: 2000,
+    6: 4000,
+    7: 8000,
+    8: 16000,
+    9: 32000,
+    10: 64000
+  };
+
+  let maxPacks = parseInt(localStorage.getItem("gacha_max_packs")) || BASE_MAX_PACKS;
   const PACK_INTERVAL_MS = 2 * 60 * 1000; // 2 minutes
 
+  // deprecated
   const FALLBACK_IMG = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100'><rect width='100' height='100' fill='%2314141a'/><text x='50%' y='55%' font-size='40' text-anchor='middle' fill='%23555'>?</text></svg>";
 
   // Load saved state from localStorage
@@ -658,6 +745,7 @@
     localStorage.setItem("gacha_coins", coins.toString());
     localStorage.setItem("gacha_xp", xp.toString());
     localStorage.setItem("gacha_packs", queuedPacks.toString());
+    localStorage.setItem("gacha_max_packs", maxPacks.toString());
     localStorage.setItem("gacha_next_pack_at", nextPackAt.toString());
   }
 
@@ -698,14 +786,14 @@
     const now = Date.now();
     let changed = false;
 
-    while (queuedPacks < MAX_PACKS && now >= nextPackAt) {
+    while (queuedPacks < maxPacks && now >= nextPackAt) {
       queuedPacks++;
       nextPackAt += PACK_INTERVAL_MS;
       changed = true;
     }
 
     // If the queue is full, keep nextPackAt pushed ahead so it starts cleanly once a pack is opened
-    if (queuedPacks >= MAX_PACKS) {
+    if (queuedPacks >= maxPacks) {
       nextPackAt = now + PACK_INTERVAL_MS;
     }
 
@@ -748,7 +836,7 @@
     }
 
     // If queue was full (5/5), start the 2-minute timer for the next pack right now
-    const wasFull = queuedPacks >= MAX_PACKS;
+    const wasFull = queuedPacks >= maxPacks;
     queuedPacks--;
     if (wasFull) {
       nextPackAt = Date.now() + PACK_INTERVAL_MS;
@@ -805,16 +893,65 @@
     return cardEl;
   }
 
-  // Switch between "pull" and "collection" tabs
+  // Switch between "pull", "collection", and "shop" tabs
   function switchTab(tabName) {
+    if (tabName === "shop") {
+      const levelInfo = getLevelInfo(xp);
+      if (levelInfo.level < SHOP_UNLOCK_LEVEL) {
+        alert(`Reach Level ${SHOP_UNLOCK_LEVEL} to unlock the Shop! (You are Level ${levelInfo.level})`);
+        return;
+      }
+    }
+
     document.getElementById("tab-pull").style.display = tabName === "pull" ? "block" : "none";
     document.getElementById("tab-collection").style.display = tabName === "collection" ? "block" : "none";
+    document.getElementById("tab-shop").style.display = tabName === "shop" ? "block" : "none";
 
     document.getElementById("btn-tab-pull").classList.toggle("active", tabName === "pull");
     document.getElementById("btn-tab-collection").classList.toggle("active", tabName === "collection");
+    document.getElementById("btn-tab-shop").classList.toggle("active", tabName === "shop");
 
-    if (tabName === "collection") {
-      renderCollection();
+    if (tabName === "collection") renderCollection();
+    if (tabName === "shop") renderShop();
+  }
+
+  // Purchase the next pack queue slot (4 through 10)
+  function buyPackSlot() {
+    const nextSlot = maxPacks + 1;
+    const cost = SLOT_COSTS[nextSlot];
+    if (!cost || coins < cost) return;
+
+    const wasFull = queuedPacks >= maxPacks;
+    coins -= cost;
+    maxPacks = nextSlot;
+
+    // If the queue was previously full, immediately start generating into the new slot
+    if (wasFull) {
+      nextPackAt = Date.now() + PACK_INTERVAL_MS;
+    }
+
+    saveState();
+    renderShop();
+    updateUI();
+  }
+
+  // Updates the Shop UI button, price, and description
+  function renderShop() {
+    document.getElementById("shopCoinBalance").textContent = coins.toLocaleString();
+
+    const descEl = document.getElementById("slotUpgradeDesc");
+    const btnEl = document.getElementById("buySlotBtn");
+    const nextSlot = maxPacks + 1;
+
+    if (maxPacks >= ABSOLUTE_MAX_PACKS) {
+      descEl.textContent = `Maximum pack queue reached (${ABSOLUTE_MAX_PACKS} / ${ABSOLUTE_MAX_PACKS} slots).`;
+      btnEl.textContent = "Maxed Out";
+      btnEl.disabled = true;
+    } else {
+      const cost = SLOT_COSTS[nextSlot];
+      descEl.textContent = `Increase your max queued packs from ${maxPacks} to ${nextSlot}.`;
+      btnEl.textContent = `Buy (${cost.toLocaleString()} Coins)`;
+      btnEl.disabled = coins < cost;
     }
   }
 
@@ -958,24 +1095,39 @@
 
     const progressPercent = Math.min(100, (levelInfo.currentLevelXP / levelInfo.xpForNext) * 100);
     document.getElementById("levelProgressFill").style.width = `${progressPercent}%`;
+    
     const packCountEl = document.getElementById("packCount");
 
     coinCountEl.textContent = coins.toLocaleString();
     xpCountEl.textContent = xp.toLocaleString();
     packCountEl.textContent = queuedPacks;
+    document.getElementById("maxPackCount").textContent = maxPacks; // <-- ADD THIS LINE
 
     btn.disabled = queuedPacks <= 0;
 
     const rewardNote = timerText.dataset.lastReward ? ` (${timerText.dataset.lastReward})` : "";
 
-    if (queuedPacks >= MAX_PACKS) {
-      timerText.textContent = `Pack queue full (5/5)!${rewardNote}`;
+    if (queuedPacks >= maxPacks) {
+      timerText.textContent = `Pack queue full (${maxPacks}/${maxPacks})!${rewardNote}`;
     } else {
       const remainingMs = Math.max(0, nextPackAt - Date.now());
       const remainingSec = Math.ceil(remainingMs / 1000);
       const mins = Math.floor(remainingSec / 60);
       const secs = (remainingSec % 60).toString().padStart(2, "0");
       timerText.textContent = `Next pack generating in ${mins}:${secs}${rewardNote}`;
+    }
+
+    const shopTabBtn = document.getElementById("btn-tab-shop");
+    if (levelInfo.level >= SHOP_UNLOCK_LEVEL) {
+      shopTabBtn.classList.remove("locked");
+      shopTabBtn.textContent = "🛒 Shop";
+    } else {
+      shopTabBtn.classList.add("locked");
+      shopTabBtn.textContent = `🔒 Shop (Lvl ${SHOP_UNLOCK_LEVEL})`;
+    }
+
+    if (document.getElementById("tab-shop").style.display === "block") {
+      renderShop();
     }
   }
 
