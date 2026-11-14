@@ -15,6 +15,7 @@
       --epic: #9673a6;
       --legendary: #d6b656;
       --mythic: #ea6b66;
+      --special: #ffbeef;
     }
 
     * { box-sizing: border-box; font-family: system-ui, -apple-system, sans-serif; }
@@ -65,6 +66,16 @@
       background: #1a1f33;
       border: 1px solid #4f46e5;
       color: #c7d2fe;
+      padding: 0.45rem 0.9rem;
+      border-radius: 999px;
+      font-weight: 700;
+      font-size: 0.95rem;
+    }
+
+    .xp-badge {
+      background: #142a22;
+      border: 1px solid #34d399;
+      color: #6ee7b7;
       padding: 0.45rem 0.9rem;
       border-radius: 999px;
       font-weight: 700;
@@ -124,6 +135,7 @@
     .rarity-Epic { border-color: var(--epic); }
     .rarity-Legendary { border-color: var(--legendary); box-shadow: 0 0 15px rgba(214, 182, 86, 0.4); }
     .rarity-Mythic { border-color: var(--mythic); box-shadow: 0 0 20px rgba(234, 107, 102, 0.6); }
+    .rarity-Special { border-color: var(--special); box-shadow: 0 0 20px rgba(255, 190, 239, 0.6); }
 
     .card-rarity { font-size: 0.75rem; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; }
     
@@ -227,6 +239,7 @@
   <div class="pull-zone">
     <div class="status-bar">
       <div class="coin-badge">🪙 Coins: <span id="coinCount">0</span></div>
+      <div class="xp-badge">⭐ XP: <span id="xpCount">0</span></div>
       <div class="queue-badge">📦 Packs: <span id="packCount">0</span> / 5</div>
     </div>
 
@@ -254,6 +267,7 @@
 </div>
 <br>
 <h2>created by xbladexgmd with help from google gemini <a href="./changelog.html">(changelog)</a></h2>
+(v1.1.1)
 </div>
 
 <script>
@@ -345,6 +359,7 @@
     ],
     Legendary: [
       { name: "JohnnyWhatttt (Aqua)", image: "images/johnny.webp" },
+      { name: "riverkiwi", image: "images/riverkiwi.webp" },
       { name: "Cheesy (manulseal)", image: "images/cheesy.webp" },
       { name: "voicechatping", image: "images/voice.webp" },
       { name: "YeckGrinding", image: "images/yeck.webp" },
@@ -353,29 +368,31 @@
     Mythic: [
       { name: "Akuriserv (Rin)", image: "images/rin.webp" },
       { name: "cinder__block", image: "images/cinder.webp" },
-      { name: "Cosmic", image: "images/cosmic.webp" },
-      { name: "EvilEmperium", image: "images/evil.webp" },
       { name: "HamsterPlayz", image: "images/hamster.webp" },
       { name: "Lilgig", image: "images/lilgig.webp" },
       { name: "Llqne", image: "images/llqne.webp" },
       { name: "Albert", image: "images/albert.webp" },
-      { name: "XBladeXGMD (aziya)", image: "images/aziya.jfif" },
       { name: "ShadowAxeKid", image: "images/shadow.webp" },
       { name: "Brapstu", image: "images/brapstu.webp" },
-      { name: "Pixelo", image: "images/pixelo.webp" },
-      { name: "riverkiwi", image: "images/kiwi.webp" }
+      { name: "Pixelo", image: "images/pixelo.webp" }
+    ],
+    Special: [
+      { name: "XBladeXGMD (aziya)", image: "images/aziya.jfif" },
+      { name: "EvilEmperium", image: "images/evil.webp" },
+      { name: "Cosmic", image: "images/cosmic.webp" },
     ]
   };
   // =========================================================================
 
   // 1. Exact Rarity Rates
   const RARITIES = [
+    { name: "Special", chance: 0.01},
     { name: "Mythic", chance: 0.075 },
     { name: "Legendary", chance: 0.3 },
     { name: "Epic", chance: 1.7 },
     { name: "Rare", chance: 7.5 },
     { name: "Uncommon", chance: 15.0 },
-    { name: "Common", chance: 75.425 }
+    { name: "Common", chance: 75.415 }
   ];
 
   // 2. Exact Modifier Rates
@@ -392,7 +409,8 @@
     Rare: 100,
     Epic: 400,
     Legendary: 800,
-    Mythic: 2400
+    Mythic: 2400,
+    Special: 8192
   };
 
   const MODIFIER_MULTIPLIERS = {
@@ -411,6 +429,7 @@
   // Load saved state from localStorage
   let collection = JSON.parse(localStorage.getItem("gacha_collection")) || {};
   let coins = parseInt(localStorage.getItem("gacha_coins")) || 0;
+  let xp = parseInt(localStorage.getItem("gacha_xp")) || 0;
 
   // For first-time visitors, start with 1 pack ready; otherwise load saved queue state
   let queuedPacks = localStorage.getItem("gacha_packs") !== null
@@ -423,6 +442,7 @@
   function saveState() {
     localStorage.setItem("gacha_collection", JSON.stringify(collection));
     localStorage.setItem("gacha_coins", coins.toString());
+    localStorage.setItem("gacha_xp", xp.toString());
     localStorage.setItem("gacha_packs", queuedPacks.toString());
     localStorage.setItem("gacha_next_pack_at", nextPackAt.toString());
   }
@@ -432,6 +452,12 @@
     const base = COIN_VALUES[rarity] || 0;
     const mult = MODIFIER_MULTIPLIERS[modifier] || 1;
     return base * mult;
+  }
+
+  // Calculates XP earned for a card (random value between 80% and 120% of its coins)
+  function calculateCardXP(cardCoins) {
+    const multiplier = 0.8 + Math.random() * 0.4; // Random decimal from 0.80 to 1.20
+    return Math.round(cardCoins * multiplier);
   }
 
   // [NEW JS] Generates queued packs automatically as 2-minute intervals pass (up to 5)
@@ -498,6 +524,7 @@
     const display = document.getElementById("packDisplay");
     display.innerHTML = "";
     let earnedThisPack = 0;
+    let earnedXPThisPack = 0;
 
     for (let i = 0; i < 3; i++) {
       let chosenRarity = rollRarity();
@@ -512,8 +539,11 @@
 
       // [NEW JS] Award coins for this card
       const cardCoins = calculateCardCoins(person.rarity, modifier);
+      const cardXP = calculateCardXP(cardCoins);
       coins += cardCoins;
+      xp += cardXP;
       earnedThisPack += cardCoins;
+      earnedXPThisPack += cardXP;
 
       const cardKey = `${person.name} [${person.rarity}] (${modifier})`;
       collection[cardKey] = (collection[cardKey] || 0) + 1;
@@ -522,9 +552,8 @@
       display.appendChild(cardEl);
     }
 
-    // Optional subtle note showing coins earned from the pack
-    const timerText = document.getElementById("timerText");
-    timerText.dataset.lastReward = `+${earnedThisPack} coins earned!`;
+   const timerText = document.getElementById("timerText");
+    timerText.dataset.lastReward = `+${earnedThisPack} coins, +${earnedXPThisPack} XP!`;
 
     saveState();
     renderCollection();
@@ -551,29 +580,32 @@
     }
   }
 
-  function renderCollection() {
+function renderCollection() {
     const list = document.getElementById("collectionList");
     list.innerHTML = "";
     const entries = Object.entries(collection);
-
+    
     if (entries.length === 0) {
       list.innerHTML = `<li style="color:#777; cursor:default;">No cards pulled yet.</li>`;
       return;
     }
 
     entries.forEach(([cardKey, count]) => {
+      // Parse cardKey back into name, rarity, modifier
       const match = cardKey.match(/^(.+?)\s+\[(.+?)\]\s+\((.+?)\)$/);
       if (!match) return;
       const [, name, rarity, modifier] = match;
 
       const li = document.createElement("li");
       li.innerHTML = `<span>${cardKey}</span> <strong>x${count}</strong>`;
+      // 👉 This makes each collection row clickable:
       li.onclick = () => showCardModal(name, rarity, modifier, count);
       list.appendChild(li);
     });
   }
 
   function showCardModal(name, rarity, modifier, count) {
+    // Find image URL from CARD_POOL
     let imageUrl = "https://via.placeholder.com/150";
     if (CARD_POOL[rarity]) {
       const found = CARD_POOL[rarity].find(p => p.name === name);
@@ -599,9 +631,11 @@
     const btn = document.getElementById("pullBtn");
     const timerText = document.getElementById("timerText");
     const coinCountEl = document.getElementById("coinCount");
+    const xpCountEl = document.getElementById("xpCount");
     const packCountEl = document.getElementById("packCount");
 
     coinCountEl.textContent = coins.toLocaleString();
+    xpCountEl.textContent = xp.toLocaleString();
     packCountEl.textContent = queuedPacks;
 
     btn.disabled = queuedPacks <= 0;
