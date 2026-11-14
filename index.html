@@ -41,6 +41,36 @@
       border: 1px solid #2e2e3a;
     }
 
+    /* Top status bar for coins & pack queue */
+    .status-bar {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 1.5rem;
+      flex-wrap: wrap;
+      margin-bottom: 1rem;
+    }
+
+    .coin-badge {
+      background: #2a2414;
+      border: 1px solid #d6b656;
+      color: #ffd966;
+      padding: 0.45rem 0.9rem;
+      border-radius: 999px;
+      font-weight: 700;
+      font-size: 0.95rem;
+    }
+
+    .queue-badge {
+      background: #1a1f33;
+      border: 1px solid #4f46e5;
+      color: #c7d2fe;
+      padding: 0.45rem 0.9rem;
+      border-radius: 999px;
+      font-weight: 700;
+      font-size: 0.95rem;
+    }
+
     button {
       background: #4f46e5;
       color: white;
@@ -195,8 +225,13 @@
 
   <!-- Pull Section -->
   <div class="pull-zone">
+    <div class="status-bar">
+      <div class="coin-badge">🪙 Coins: <span id="coinCount">0</span></div>
+      <div class="queue-badge">📦 Packs: <span id="packCount">0</span> / 5</div>
+    </div>
+
     <button id="pullBtn" onclick="openPack()">Open Pack (3 Cards)</button>
-    <p id="timerText" style="color: #a3a3a3; margin-top: 0.75rem;">Ready to pull!</p>
+    <p id="timerText" style="color: #a3a3a3; margin-top: 0.75rem;">Checking pack queue...</p>
     <div class="pack-display" id="packDisplay"></div>
   </div>
 
@@ -218,7 +253,7 @@
   </div>
 </div>
 <br>
-<h2>created by xbladexgmd with help from google gemini</h2>
+<h2>created by xbladexgmd with help from google gemini <a href="./changelog.html">(changelog)</a></h2>
 </div>
 
 <script>
@@ -310,6 +345,7 @@
     ],
     Legendary: [
       { name: "JohnnyWhatttt (Aqua)", image: "images/johnny.webp" },
+      { name: "riverkiwi", image: "images/riverkiwi.webp" },
       { name: "Cheesy (manulseal)", image: "images/cheesy.webp" },
       { name: "voicechatping", image: "images/voice.webp" },
       { name: "YeckGrinding", image: "images/yeck.webp" },
@@ -327,9 +363,7 @@
       { name: "XBladeXGMD (aziya)", image: "images/aziya.jfif" },
       { name: "ShadowAxeKid", image: "images/shadow.webp" },
       { name: "Brapstu", image: "images/brapstu.webp" },
-      { name: "riverkiwi", image: "images/kiwi.webp" },
       { name: "Pixelo", image: "images/pixelo.webp" }
-      
     ]
   };
   // =========================================================================
@@ -351,15 +385,74 @@
     { name: "Holo", chance: 1 / 20 }
   ];
 
-  const COOLDOWN_MS = 2 * 60 * 1000; // 2 minutes
+  // [NEW JS] Coin values per rarity and multipliers per modifier
+  const COIN_VALUES = {
+    Common: 10,
+    Uncommon: 20,
+    Rare: 100,
+    Epic: 400,
+    Legendary: 800,
+    Mythic: 2400
+  };
+
+  const MODIFIER_MULTIPLIERS = {
+    Standard: 1,
+    Holo: 2,
+    Foil: 4,
+    Shiny: 8
+  };
+
+  // [NEW JS] Pack Queue settings (max 5 packs, 1 new pack every 2 minutes)
+  const MAX_PACKS = 5;
+  const PACK_INTERVAL_MS = 2 * 60 * 1000; // 2 minutes
+
   const FALLBACK_IMG = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100'><rect width='100' height='100' fill='%2314141a'/><text x='50%' y='55%' font-size='40' text-anchor='middle' fill='%23555'>?</text></svg>";
 
+  // Load saved state from localStorage
   let collection = JSON.parse(localStorage.getItem("gacha_collection")) || {};
-  let lastPullTime = parseInt(localStorage.getItem("gacha_last_pull")) || 0;
+  let coins = parseInt(localStorage.getItem("gacha_coins")) || 0;
+
+  // For first-time visitors, start with 1 pack ready; otherwise load saved queue state
+  let queuedPacks = localStorage.getItem("gacha_packs") !== null
+    ? parseInt(localStorage.getItem("gacha_packs"))
+    : 1;
+
+  // Timestamp of when the current generation cycle started
+  let nextPackAt = parseInt(localStorage.getItem("gacha_next_pack_at")) || (Date.now() + PACK_INTERVAL_MS);
 
   function saveState() {
     localStorage.setItem("gacha_collection", JSON.stringify(collection));
-    localStorage.setItem("gacha_last_pull", lastPullTime.toString());
+    localStorage.setItem("gacha_coins", coins.toString());
+    localStorage.setItem("gacha_packs", queuedPacks.toString());
+    localStorage.setItem("gacha_next_pack_at", nextPackAt.toString());
+  }
+
+  // [NEW JS] Calculates coins earned for a single pulled card
+  function calculateCardCoins(rarity, modifier) {
+    const base = COIN_VALUES[rarity] || 0;
+    const mult = MODIFIER_MULTIPLIERS[modifier] || 1;
+    return base * mult;
+  }
+
+  // [NEW JS] Generates queued packs automatically as 2-minute intervals pass (up to 5)
+  function syncPackQueue() {
+    const now = Date.now();
+    let changed = false;
+
+    while (queuedPacks < MAX_PACKS && now >= nextPackAt) {
+      queuedPacks++;
+      nextPackAt += PACK_INTERVAL_MS;
+      changed = true;
+    }
+
+    // If the queue is full, keep nextPackAt pushed ahead so it starts cleanly once a pack is opened
+    if (queuedPacks >= MAX_PACKS) {
+      nextPackAt = now + PACK_INTERVAL_MS;
+    }
+
+    if (changed) {
+      saveState();
+    }
   }
 
   function rollRarity() {
@@ -386,7 +479,8 @@
   }
 
   function openPack() {
-    if (Date.now() - lastPullTime < COOLDOWN_MS) return;
+    syncPackQueue();
+    if (queuedPacks <= 0) return;
 
     const allCards = getAllCardsFallback();
     if (allCards.length === 0) {
@@ -394,15 +488,21 @@
       return;
     }
 
-    lastPullTime = Date.now();
+    // If queue was full (5/5), start the 2-minute timer for the next pack right now
+    const wasFull = queuedPacks >= MAX_PACKS;
+    queuedPacks--;
+    if (wasFull) {
+      nextPackAt = Date.now() + PACK_INTERVAL_MS;
+    }
+
     const display = document.getElementById("packDisplay");
     display.innerHTML = "";
+    let earnedThisPack = 0;
 
     for (let i = 0; i < 3; i++) {
       let chosenRarity = rollRarity();
       let candidates = (CARD_POOL[chosenRarity] || []).map(p => ({ ...p, rarity: chosenRarity }));
 
-      // Fallback if a rarity category is left empty
       if (candidates.length === 0) {
         candidates = allCards;
       }
@@ -410,25 +510,37 @@
       const person = candidates[Math.floor(Math.random() * candidates.length)];
       const modifier = rollModifier();
 
-      // Save to user's local collection
+      // [NEW JS] Award coins for this card
+      const cardCoins = calculateCardCoins(person.rarity, modifier);
+      coins += cardCoins;
+      earnedThisPack += cardCoins;
+
       const cardKey = `${person.name} [${person.rarity}] (${modifier})`;
       collection[cardKey] = (collection[cardKey] || 0) + 1;
 
-      // Render card
-      const cardEl = document.createElement("div");
-      cardEl.className = `card rarity-${person.rarity} mod-${modifier}`;
-      cardEl.innerHTML = `
-        <div class="card-rarity" style="color: var(--${person.rarity.toLowerCase()})">${person.rarity}</div>
-        <img class="card-img" src="${person.image}" onerror="this.src='${FALLBACK_IMG}'" alt="${person.name}" />
-        <div class="card-name">${person.name}</div>
-        <div class="card-mod">${modifier === "Standard" ? "Normal" : "✨ " + modifier}</div>
-      `;
+      const cardEl = createCardElement(person.name, person.rarity, modifier, person.image);
       display.appendChild(cardEl);
     }
 
+    // Optional subtle note showing coins earned from the pack
+    const timerText = document.getElementById("timerText");
+    timerText.dataset.lastReward = `+${earnedThisPack} coins earned!`;
+
     saveState();
     renderCollection();
-    updateTimer();
+    updateUI();
+  }
+
+  function createCardElement(name, rarity, modifier, imageUrl) {
+    const cardEl = document.createElement("div");
+    cardEl.className = `card rarity-${rarity} mod-${modifier}`;
+    cardEl.innerHTML = `
+      <div class="card-rarity" style="color: var(--${rarity.toLowerCase()})">${rarity}</div>
+      <img class="card-img" src="${imageUrl}" onerror="this.src='${FALLBACK_IMG}'" alt="${name}" />
+      <div class="card-name">${name}</div>
+      <div class="card-mod">${modifier === "Standard" ? "Normal" : "✨ " + modifier}</div>
+    `;
+    return cardEl;
   }
 
   function clearCollection() {
@@ -443,65 +555,25 @@
     const list = document.getElementById("collectionList");
     list.innerHTML = "";
     const entries = Object.entries(collection);
-    if (entries.length === 0) {
-      list.innerHTML = `<li style="color:#777;">No cards pulled yet.</li>`;
-      return;
-    }
-    entries.forEach(([cardName, count]) => {
-      const li = document.createElement("li");
-      li.innerHTML = `<span>${cardName}</span> <strong>x${count}</strong>`;
-      list.appendChild(li);
-    });
-  }
 
-  function updateTimer() {
-    const btn = document.getElementById("pullBtn");
-    const timerText = document.getElementById("timerText");
-    const elapsed = Date.now() - lastPullTime;
-
-    if (elapsed >= COOLDOWN_MS) {
-      btn.disabled = false;
-      timerText.textContent = "Pack ready!";
-    } else {
-      btn.disabled = true;
-      const remaining = Math.ceil((COOLDOWN_MS - elapsed) / 1000);
-      const mins = Math.floor(remaining / 60);
-      const secs = (remaining % 60).toString().padStart(2, "0");
-      timerText.textContent = `Next pack available in ${mins}:${secs}`;
-    }
-  }
-
-  // Initialize
-  renderCollection();
-  updateTimer();
-  setInterval(updateTimer, 1000);
-
-  function renderCollection() {
-    const list = document.getElementById("collectionList");
-    list.innerHTML = "";
-    const entries = Object.entries(collection);
-    
     if (entries.length === 0) {
       list.innerHTML = `<li style="color:#777; cursor:default;">No cards pulled yet.</li>`;
       return;
     }
 
     entries.forEach(([cardKey, count]) => {
-      // Parse cardKey back into name, rarity, modifier
       const match = cardKey.match(/^(.+?)\s+\[(.+?)\]\s+\((.+?)\)$/);
       if (!match) return;
       const [, name, rarity, modifier] = match;
 
       const li = document.createElement("li");
       li.innerHTML = `<span>${cardKey}</span> <strong>x${count}</strong>`;
-      // 👉 This makes each collection row clickable:
       li.onclick = () => showCardModal(name, rarity, modifier, count);
       list.appendChild(li);
     });
   }
 
   function showCardModal(name, rarity, modifier, count) {
-    // Find image URL from CARD_POOL
     let imageUrl = "https://via.placeholder.com/150";
     if (CARD_POOL[rarity]) {
       const found = CARD_POOL[rarity].find(p => p.name === name);
@@ -519,6 +591,38 @@
   function closeModal() {
     document.getElementById("cardModal").classList.remove("active");
   }
+
+  // [NEW JS] Updates coins, pack count, and queue generation timer every second
+  function updateUI() {
+    syncPackQueue();
+
+    const btn = document.getElementById("pullBtn");
+    const timerText = document.getElementById("timerText");
+    const coinCountEl = document.getElementById("coinCount");
+    const packCountEl = document.getElementById("packCount");
+
+    coinCountEl.textContent = coins.toLocaleString();
+    packCountEl.textContent = queuedPacks;
+
+    btn.disabled = queuedPacks <= 0;
+
+    const rewardNote = timerText.dataset.lastReward ? ` (${timerText.dataset.lastReward})` : "";
+
+    if (queuedPacks >= MAX_PACKS) {
+      timerText.textContent = `Pack queue full (5/5)!${rewardNote}`;
+    } else {
+      const remainingMs = Math.max(0, nextPackAt - Date.now());
+      const remainingSec = Math.ceil(remainingMs / 1000);
+      const mins = Math.floor(remainingSec / 60);
+      const secs = (remainingSec % 60).toString().padStart(2, "0");
+      timerText.textContent = `Next pack generating in ${mins}:${secs}${rewardNote}`;
+    }
+  }
+
+  // Initialize
+  renderCollection();
+  updateUI();
+  setInterval(updateUI, 1000);
 </script>
 </body>
 </html>
