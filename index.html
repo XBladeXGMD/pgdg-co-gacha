@@ -501,7 +501,7 @@
     <div class="panel">
       <div class="collection-header">
         <div>
-          <h2 style="margin-bottom: 0.2rem;">Upgrades</h2>
+          <h2 style="margin-bottom: 0.2rem;">Upgrades and Items</h2>
           <span style="font-size: 0.9rem; color: #ffd966;">
             Your Balance: <strong id="shopCoinBalance">0</strong> Coins
           </span>
@@ -517,7 +517,35 @@
         <button id="buySlotBtn" class="buy-btn" onclick="buyPackSlot()">Buy (1,000 Coins)</button>
       </div>
     </div>
+
+    <!-- Time Reduction Upgrade Item (Add right below the Pack Queue Slot .shop-item) -->
+      <div class="shop-item" style="margin-top: 1rem;">
+        <div class="shop-item-info">
+          <h3 id="timeUpgradeTitle">⏱️ Time Reduction I</h3>
+          <p id="timeUpgradeDesc">Reduce pack generation time from 2:00 to 1:55.</p>
+        </div>
+        <button id="buyTimeBtn" class="buy-btn" onclick="buyTimeReduction()">Buy (10,000 Coins)</button>
+      </div>
+
+      <!-- Buy Extra Pack Item  -->
+      <div class="shop-item" style="margin-top: 1rem;">
+        <div class="shop-item-info">
+          <h3>🎴 +1 Pack</h3>
+          <p id="buyPackDesc">Can't wait for another pack? Buy one more!</p>
+        </div>
+        <button id="buyPackBtn" class="buy-btn" onclick="buyPack()">Buy (1,500 Coins)</button>
+      </div>
+
+      <!-- Four-Leaf Clover Placebo Item (Add inside #tab-shop) -->
+      <div class="shop-item" style="margin-top: 1rem;">
+        <div class="shop-item-info">
+          <h3>🍀 Four-Leaf Clover</h3>
+          <p id="cloverDesc">Increases luck by 1*10^-100%. Buy as many as you deem necessary. (Owned: 0)</p>
+        </div>
+        <button id="buyCloverBtn" class="buy-btn" onclick="buyClover()">Buy (1 Coin)</button>
+      </div>
   </div>
+
 
   <!-- Modal Popup for Card Preview -->
 <div id="cardModal" class="modal" onclick="closeModal()">
@@ -529,7 +557,7 @@
 </div>
 <br>
 <h2>created by xbladexgmd with help from google gemini <a href="./changelog.html">(changelog)</a></h2>
-(v1.3)
+(v1.3.1) <a id="gameInfoToast" href="./info.html">How to Play/Help</a>
 </div>
 
 <script>
@@ -640,6 +668,7 @@
       { name: "HamsterPlayz", image: "images/hamster.webp" },
       { name: "Lilgig", image: "images/lilgig.webp" },
       { name: "Llqne", image: "images/llqne.webp" },
+      { name: "Albert", image: "images/albert.webp" },
       { name: "ShadowAxeKid", image: "images/shadow.webp" },
       { name: "Brapstu", image: "images/brapstu.webp" },
       { name: "Pixelo", image: "images/pixelo.webp" },
@@ -648,8 +677,7 @@
     Special: [
       { name: "XBladeXGMD (aziya)", image: "images/aziya.jfif" },
       { name: "EvilEmperium", image: "images/evil.webp" },
-      { name: "Albert", image: "images/albert.webp" },
-      { name: "Cosmic", image: "images/cosmic.webp" }
+      { name: "Cosmic", image: "images/cosmic.webp" },
     ]
   };
   // =========================================================================
@@ -694,6 +722,9 @@
   const BASE_MAX_PACKS = 3;
   const ABSOLUTE_MAX_PACKS = 10;
   const SHOP_UNLOCK_LEVEL = 15;
+  
+  const PACK_SHOP_COST = 2000;
+  let cloverCount = parseInt(localStorage.getItem("gacha_clovers")) || 0;
 
   // Exact coin cost to unlock each respective slot (4 through 10)
   const SLOT_COSTS = {
@@ -707,8 +738,25 @@
   };
 
   let maxPacks = parseInt(localStorage.getItem("gacha_max_packs")) || BASE_MAX_PACKS;
-  const PACK_INTERVAL_MS = 2 * 60 * 1000; // 2 minutes
+  const BASE_PACK_INTERVAL_MS = 2 * 60 * 1000; // 2:00 (120,000 ms)
 
+  // time reduction (-5 per each upgrade)
+  const TIME_UPGRADES = [
+    { name: "Time Reduction I",   cost: 10000, reqLevel: 24 },
+    { name: "Time Reduction II",  cost: 15000, reqLevel: 30 },
+    { name: "Time Reduction III", cost: 20000, reqLevel: 36 },
+    { name: "Time Reduction IV",  cost: 30000, reqLevel: 42 },
+    { name: "Time Reduction V",   cost: 50000, reqLevel: 56 },
+    { name: "Time Reduction VI",  cost: 80000, reqLevel: 78 }
+  ];
+
+  // Saved upgrade level (0 = none bought, up to 6 = Time Reduction VI bought)
+  let timeUpgradeLevel = parseInt(localStorage.getItem("gacha_time_upgrade")) || 0;
+
+  // Returns the current pack interval in milliseconds based on upgrades owned
+  function getPackIntervalMs() {
+    return BASE_PACK_INTERVAL_MS - (timeUpgradeLevel * 5000);
+  }
   // deprecated
   const FALLBACK_IMG = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100'><rect width='100' height='100' fill='%2314141a'/><text x='50%' y='55%' font-size='40' text-anchor='middle' fill='%23555'>?</text></svg>";
 
@@ -737,7 +785,7 @@
     : 1;
 
   // Timestamp of when the current generation cycle started
-  let nextPackAt = parseInt(localStorage.getItem("gacha_next_pack_at")) || (Date.now() + PACK_INTERVAL_MS);
+  let nextPackAt = parseInt(localStorage.getItem("gacha_next_pack_at")) || (Date.now() + getPackIntervalMs());
 
   function saveState() {
     localStorage.setItem("gacha_collection", JSON.stringify(collection));
@@ -746,6 +794,8 @@
     localStorage.setItem("gacha_xp", xp.toString());
     localStorage.setItem("gacha_packs", queuedPacks.toString());
     localStorage.setItem("gacha_max_packs", maxPacks.toString());
+    localStorage.setItem("gacha_time_upgrade", timeUpgradeLevel.toString());
+    localStorage.setItem("gacha_clovers", cloverCount.toString());
     localStorage.setItem("gacha_next_pack_at", nextPackAt.toString());
   }
 
@@ -788,13 +838,13 @@
 
     while (queuedPacks < maxPacks && now >= nextPackAt) {
       queuedPacks++;
-      nextPackAt += PACK_INTERVAL_MS;
+      nextPackAt += getPackIntervalMs();
       changed = true;
     }
 
     // If the queue is full, keep nextPackAt pushed ahead so it starts cleanly once a pack is opened
     if (queuedPacks >= maxPacks) {
-      nextPackAt = now + PACK_INTERVAL_MS;
+      nextPackAt = now + getPackIntervalMs();
     }
 
     if (changed) {
@@ -839,7 +889,7 @@
     const wasFull = queuedPacks >= maxPacks;
     queuedPacks--;
     if (wasFull) {
-      nextPackAt = Date.now() + PACK_INTERVAL_MS;
+      nextPackAt = Date.now() + getPackIntervalMs();
     }
 
     const display = document.getElementById("packDisplay");
@@ -927,8 +977,60 @@
 
     // If the queue was previously full, immediately start generating into the new slot
     if (wasFull) {
-      nextPackAt = Date.now() + PACK_INTERVAL_MS;
+      nextPackAt = Date.now() + getPackIntervalMs();
     }
+
+    saveState();
+    renderShop();
+    updateUI();
+  }
+
+  // Helper to format milliseconds as M:SS (e.g., 115000 -> "1:55")
+  function formatDuration(ms) {
+    const totalSec = Math.floor(ms / 1000);
+    const mins = Math.floor(totalSec / 60);
+    const secs = (totalSec % 60).toString().padStart(2, "0");
+    return `${mins}:${secs}`;
+  }
+
+  // Purchase the next Time Reduction tier
+  function buyTimeReduction() {
+    const nextTier = TIME_UPGRADES[timeUpgradeLevel];
+    const levelInfo = getLevelInfo(xp);
+
+    if (!nextTier || levelInfo.level < nextTier.reqLevel || coins < nextTier.cost) return;
+
+    coins -= nextTier.cost;
+    timeUpgradeLevel++;
+
+    // Cap the active countdown timer if its remaining time exceeds the new faster interval
+    const newInterval = getPackIntervalMs();
+    if (nextPackAt - Date.now() > newInterval) {
+      nextPackAt = Date.now() + newInterval;
+    }
+
+    saveState();
+    renderShop();
+    updateUI();
+  }
+
+  // Purchase +1 pack directly into the queue if not full
+  function buyPack() {
+    if (queuedPacks >= maxPacks || coins < PACK_SHOP_COST) return;
+
+    coins -= PACK_SHOP_COST;
+    queuedPacks++;
+
+    saveState();
+    renderShop();
+    updateUI();
+  }
+
+  function buyClover() {
+    if (coins < 1) return;
+
+    coins -= 1;
+    cloverCount++;
 
     saveState();
     renderShop();
@@ -953,7 +1055,55 @@
       btnEl.textContent = `Buy (${cost.toLocaleString()} Coins)`;
       btnEl.disabled = coins < cost;
     }
+
+    // --- Render Time Reduction Upgrade (Add at the bottom of renderShop) ---
+    const timeTitleEl = document.getElementById("timeUpgradeTitle");
+    const timeDescEl = document.getElementById("timeUpgradeDesc");
+    const timeBtnEl = document.getElementById("buyTimeBtn");
+    const currentInterval = getPackIntervalMs();
+
+    if (timeUpgradeLevel >= TIME_UPGRADES.length) {
+      timeTitleEl.textContent = "⏱️ Time Reduction (Maxed)";
+      timeDescEl.textContent = `Maximum speed reached (${formatDuration(currentInterval)} per pack).`;
+      timeBtnEl.textContent = "Maxed Out";
+      timeBtnEl.disabled = true;
+    } else {
+      const nextTier = TIME_UPGRADES[timeUpgradeLevel];
+      const nextInterval = currentInterval - 5000;
+      const playerLevel = getLevelInfo(xp).level;
+
+      timeTitleEl.textContent = `⏱️ ${nextTier.name}`;
+      timeDescEl.textContent = `Reduce pack timer from ${formatDuration(currentInterval)} to ${formatDuration(nextInterval)} (Req. Level ${nextTier.reqLevel}).`;
+
+      if (playerLevel < nextTier.reqLevel) {
+        timeBtnEl.textContent = `Locked (Lvl ${nextTier.reqLevel})`;
+        timeBtnEl.disabled = true;
+      } else {
+        timeBtnEl.textContent = `Buy (${nextTier.cost.toLocaleString()} Coins)`;
+        timeBtnEl.disabled = coins < nextTier.cost;
+      }
+    }
+
+    // --- Render Buy +1 Pack Item (Add at the bottom inside renderShop) ---
+    const buyPackBtnEl = document.getElementById("buyPackBtn");
+    const buyPackDescEl = document.getElementById("buyPackDesc");
+
+    if (queuedPacks >= maxPacks) {
+      buyPackDescEl.textContent = `Can't wait for another pack? Buy one more! (Queue full: ${queuedPacks}/${maxPacks})`;
+      buyPackBtnEl.textContent = "Queue Full";
+      buyPackBtnEl.disabled = true;
+    } else {
+      buyPackDescEl.textContent = `Can't wait for another pack? Buy one more! (${queuedPacks}/${maxPacks} queued)`;
+      buyPackBtnEl.textContent = `Buy (${PACK_SHOP_COST.toLocaleString()} Coins)`;
+      buyPackBtnEl.disabled = coins < PACK_SHOP_COST;
+    }
+
+    document.getElementById("cloverDesc").textContent =
+      `Increases luck by 1*10^-100%. Buy as many as you deem necessary. (Owned: ${cloverCount.toLocaleString()})`;
+    document.getElementById("buyCloverBtn").disabled = coins < 1;
   }
+
+  
 
   // favorites first
   function toggleFavoriteSort() {
