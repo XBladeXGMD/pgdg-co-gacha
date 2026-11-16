@@ -393,6 +393,125 @@
       background: #2a2414;
     }
 
+    .reward-package {
+      position: fixed;
+      z-index: 999;
+      width: 68px;
+      height: 68px;
+      border-radius: 16px;
+      border: 2px solid #facc15;
+      background: radial-gradient(circle at 30% 30%, #fef08a, #eab308 65%, #ca8a04);
+      box-shadow: 0 0 24px rgba(250, 204, 21, 0.65), 0 8px 20px rgba(0, 0, 0, 0.55);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2rem;
+      cursor: pointer;
+      user-select: none;
+      opacity: 0;
+      transform: scale(0.8);
+      animation: packageLifecycle 20s ease-in-out forwards;
+    }
+
+    .reward-package:hover {
+      filter: brightness(1.1);
+    }
+
+    /* 5s fade in + 10s visible + 5s fade out = 20s total */
+    @keyframes packageLifecycle {
+      0% {
+        opacity: 0;
+        transform: scale(0.8);
+      }
+      25% {
+        opacity: 1;
+        transform: scale(1);
+      }
+      75% {
+        opacity: 1;
+        transform: scale(1);
+      }
+      100% {
+        opacity: 0;
+        transform: scale(0.85);
+      }
+    }
+
+    /* package toast for rewards display */
+    .package-toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #231934;
+      border: 1px solid #facc15;
+      color: #fef9c3;
+      padding: 0.65rem 1.2rem;
+      border-radius: 999px;
+      font-weight: 700;
+      font-size: 0.95rem;
+      z-index: 1000;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+      pointer-events: none;
+    }
+
+    /* Corner badge bubble on the XP Progress tab button */
+    .tab-btn {
+      position: relative;
+    }
+
+    .perk-badge {
+      position: absolute;
+      top: -7px;
+      right: -7px;
+      min-width: 20px;
+      height: 20px;
+      padding: 0 5px;
+      border-radius: 999px;
+      background: #ef4444;
+      color: #ffffff;
+      border: 2px solid #181024;
+      font-size: 0.72rem;
+      font-weight: 800;
+      line-height: 16px;
+      text-align: center;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+    }
+
+    .perk-badge.hidden {
+      display: none;
+    }
+
+    /* Perk list inside XP Progress tab */
+    .perk-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.85rem;
+      margin-top: 1rem;
+    }
+
+    .perk-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1rem;
+      padding: 0.9rem 1rem;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .perk-item-info h3 {
+      margin: 0 0 0.25rem 0;
+      font-size: 1rem;
+    }
+
+    .perk-item-info p {
+      margin: 0;
+      font-size: 0.88rem;
+      opacity: 0.85;
+    }
+
     /* Modal Popup */
     .modal {
       display: none;
@@ -445,6 +564,10 @@
       📚 Collection (<span id="tabTotalCards">0</span>)
     </button>
     <button id="btn-tab-shop" class="tab-btn locked" onclick="switchTab('shop')">🔒 Shop (Lvl 15)</button>
+    <button id="btn-tab-progress" class="tab-btn" onclick="switchTab('progress')">
+      📈 XP Progress
+      <span id="perkTokenBadge" class="perk-badge hidden">0</span>
+    </button>
   </div>
 
   <!-- TAB 1: Pack Opener -->
@@ -546,6 +669,13 @@
       </div>
   </div>
 
+<!-- XP Progress & Perks Tab -->
+    <div id="tab-progress" class="tab-panel" style="display: none;">
+      <h2>📈 XP Progress & Perks</h2>
+      <p>Available Perk Tokens: <strong id="availablePerkTokens">0</strong></p>
+      <div id="perkList" class="perk-list"></div>
+    </div>
+
 
   <!-- Modal Popup for Card Preview -->
 <div id="cardModal" class="modal" onclick="closeModal()">
@@ -557,8 +687,10 @@
 </div>
 <br>
 <h2>created by xbladexgmd with help from google gemini <a href="./changelog.html">(changelog)</a></h2>
-(v1.3.1) <a id="gameInfoToast" href="./info.html">How to Play/Help</a>
+(v1.4) <a id="gameInfoToast" href="./info.html">How to Play/Help</a>
 </div>
+
+<div id="packageLayer"></div>
 
 <script>
   // =========================================================================
@@ -668,7 +800,6 @@
       { name: "HamsterPlayz", image: "images/hamster.webp" },
       { name: "Lilgig", image: "images/lilgig.webp" },
       { name: "Llqne", image: "images/llqne.webp" },
-      { name: "Albert", image: "images/albert.webp" },
       { name: "ShadowAxeKid", image: "images/shadow.webp" },
       { name: "Brapstu", image: "images/brapstu.webp" },
       { name: "Pixelo", image: "images/pixelo.webp" },
@@ -677,7 +808,8 @@
     Special: [
       { name: "XBladeXGMD (aziya)", image: "images/aziya.jfif" },
       { name: "EvilEmperium", image: "images/evil.webp" },
-      { name: "Cosmic", image: "images/cosmic.webp" },
+      { name: "Albert", image: "images/albert.webp" },
+      { name: "Cosmic", image: "images/cosmic.webp" }
     ]
   };
   // =========================================================================
@@ -723,7 +855,7 @@
   const ABSOLUTE_MAX_PACKS = 10;
   const SHOP_UNLOCK_LEVEL = 15;
   
-  const PACK_SHOP_COST = 2000;
+  const PACK_SHOP_COST = 1200;
   let cloverCount = parseInt(localStorage.getItem("gacha_clovers")) || 0;
 
   // Exact coin cost to unlock each respective slot (4 through 10)
@@ -737,6 +869,57 @@
     10: 64000
   };
 
+  const PERK_CONFIG = [
+    {
+      id: "pullingProficiency",
+      name: "✨ Pulling Proficiency",
+      bonusPerLevel: 2,
+      unit: "% XP per pull",
+      costs: [1, 1, 2, 2, 4, 4, 8, 12, 16, 24, 32]
+    },
+    {
+      id: "potOfGold",
+      name: "🪙 Pot of Gold",
+      bonusPerLevel: 2,
+      unit: "% Coins per pull",
+      costs: [1, 2, 2, 2, 4, 4, 8, 10, 12, 18, 22, 26, 32]
+    },
+    {
+      id: "deliveryMastery",
+      name: "📦 Package Frequency",
+      bonusPerLevel: 2,
+      unit: "% more common package drops",
+      costs: [2, 2, 4, 4, 8, 12, 12, 12, 12]
+    }
+  ];
+  // Delivery Mastery is the old name for Package Frequency, internally its still delivery mastery...
+
+  let perkLevels = JSON.parse(localStorage.getItem("gacha_perk_levels")) || {
+    pullingProficiency: 0,
+    potOfGold: 0,
+    deliveryMastery: 0
+  };
+
+  function getTotalEarnedTokens() {
+    const level = getLevelInfo(xp).level;
+    return Math.max(0, level - 1);
+  }
+
+  function getSpentPerkTokens() {
+    let spent = 0;
+    for (const perk of PERK_CONFIG) {
+      const lvl = perkLevels[perk.id] || 0;
+      for (let i = 0; i < lvl; i++) {
+        spent += perk.costs[i] || 0;
+      }
+    }
+    return spent;
+  }
+
+  function getAvailablePerkTokens() {
+    return Math.max(0, getTotalEarnedTokens() - getSpentPerkTokens());
+  }
+
   let maxPacks = parseInt(localStorage.getItem("gacha_max_packs")) || BASE_MAX_PACKS;
   const BASE_PACK_INTERVAL_MS = 2 * 60 * 1000; // 2:00 (120,000 ms)
 
@@ -746,8 +929,8 @@
     { name: "Time Reduction II",  cost: 15000, reqLevel: 30 },
     { name: "Time Reduction III", cost: 20000, reqLevel: 36 },
     { name: "Time Reduction IV",  cost: 30000, reqLevel: 42 },
-    { name: "Time Reduction V",   cost: 50000, reqLevel: 56 },
-    { name: "Time Reduction VI",  cost: 80000, reqLevel: 78 }
+    { name: "Time Reduction V",   cost: 50000, reqLevel: 54 },
+    { name: "Time Reduction VI",  cost: 80000, reqLevel: 68 }
   ];
 
   // Saved upgrade level (0 = none bought, up to 6 = Time Reduction VI bought)
@@ -796,6 +979,7 @@
     localStorage.setItem("gacha_max_packs", maxPacks.toString());
     localStorage.setItem("gacha_time_upgrade", timeUpgradeLevel.toString());
     localStorage.setItem("gacha_clovers", cloverCount.toString());
+    localStorage.setItem("gacha_perk_levels", JSON.stringify(perkLevels));
     localStorage.setItem("gacha_next_pack_at", nextPackAt.toString());
   }
 
@@ -821,7 +1005,7 @@
     while (xpRemaining >= xpForNext) {
       xpRemaining -= xpForNext;
       level++;
-      xpForNext = Math.floor(100 * Math.pow(1.055, level - 1));
+      xpForNext = Math.floor(100 * Math.pow(1.048, level - 1));
     }
 
     return {
@@ -909,8 +1093,10 @@
       const modifier = rollModifier();
 
       // award coins for this card
-      const cardCoins = calculateCardCoins(person.rarity, modifier);
-      const cardXP = calculateCardXP(cardCoins);
+      const xpMultiplier = 1 + ((perkLevels.pullingProficiency || 0) * 0.02);
+      const coinMultiplier = 1 + ((perkLevels.potOfGold || 0) * 0.02);
+      const cardCoins = Math.ceil(calculateCardCoins(person.rarity, modifier) * coinMultiplier);
+      const cardXP = Math.ceil(calculateCardXP(cardCoins) * xpMultiplier);
       coins += cardCoins;
       xp += cardXP;
       earnedThisPack += cardCoins;
@@ -921,6 +1107,7 @@
 
       const cardEl = createCardElement(person.name, person.rarity, modifier, person.image);
       display.appendChild(cardEl);
+      
     }
 
    const timerText = document.getElementById("timerText");
@@ -945,25 +1132,28 @@
 
   // Switch between "pull", "collection", and "shop" tabs
   function switchTab(tabName) {
-    if (tabName === "shop") {
-      const levelInfo = getLevelInfo(xp);
-      if (levelInfo.level < SHOP_UNLOCK_LEVEL) {
-        alert(`Reach Level ${SHOP_UNLOCK_LEVEL} to unlock the Shop! (You are Level ${levelInfo.level})`);
-        return;
-      }
+  if (tabName === "shop") {
+    const levelInfo = getLevelInfo(xp);
+    if (levelInfo.level < SHOP_UNLOCK_LEVEL) {
+      alert(`Reach Level ${SHOP_UNLOCK_LEVEL} to unlock the Shop! (You are Level ${levelInfo.level})`);
+      return;
     }
-
-    document.getElementById("tab-pull").style.display = tabName === "pull" ? "block" : "none";
-    document.getElementById("tab-collection").style.display = tabName === "collection" ? "block" : "none";
-    document.getElementById("tab-shop").style.display = tabName === "shop" ? "block" : "none";
-
-    document.getElementById("btn-tab-pull").classList.toggle("active", tabName === "pull");
-    document.getElementById("btn-tab-collection").classList.toggle("active", tabName === "collection");
-    document.getElementById("btn-tab-shop").classList.toggle("active", tabName === "shop");
-
-    if (tabName === "collection") renderCollection();
-    if (tabName === "shop") renderShop();
   }
+
+  document.getElementById("tab-pull").style.display = tabName === "pull" ? "block" : "none";
+  document.getElementById("tab-collection").style.display = tabName === "collection" ? "block" : "none";
+  document.getElementById("tab-shop").style.display = tabName === "shop" ? "block" : "none";
+  document.getElementById("tab-progress").style.display = tabName === "progress" ? "block" : "none";
+
+  document.getElementById("btn-tab-pull").classList.toggle("active", tabName === "pull");
+  document.getElementById("btn-tab-collection").classList.toggle("active", tabName === "collection");
+  document.getElementById("btn-tab-shop").classList.toggle("active", tabName === "shop");
+  document.getElementById("btn-tab-progress").classList.toggle("active", tabName === "progress");
+
+  if (tabName === "collection") renderCollection();
+  if (tabName === "shop") renderShop();
+  if (tabName === "progress") renderPerks();
+}
 
   // Purchase the next pack queue slot (4 through 10)
   function buyPackSlot() {
@@ -1035,6 +1225,75 @@
     saveState();
     renderShop();
     updateUI();
+  }
+
+  function buyPerk(perkId) {
+    const perk = PERK_CONFIG.find(p => p.id === perkId);
+    if (!perk) return;
+
+    const currentLvl = perkLevels[perk.id] || 0;
+    if (currentLvl >= perk.costs.length) return;
+
+    const cost = perk.costs[currentLvl];
+    if (getAvailablePerkTokens() < cost) return;
+
+    perkLevels[perk.id] = currentLvl + 1;
+    saveState();
+    renderPerks();
+    updateUI();
+  }
+
+  function renderPerks() {
+    const listEl = document.getElementById("perkList");
+    const availEl = document.getElementById("availablePerkTokens");
+    if (!listEl || !availEl) return;
+
+    const availableTokens = getAvailablePerkTokens();
+    availEl.textContent = availableTokens.toLocaleString();
+    listEl.innerHTML = "";
+
+    for (const perk of PERK_CONFIG) {
+      const lvl = perkLevels[perk.id] || 0;
+      const maxLvl = perk.costs.length;
+      const currentBonus = lvl * perk.bonusPerLevel;
+
+      const row = document.createElement("div");
+      row.className = "perk-item";
+
+      const info = document.createElement("div");
+      info.className = "perk-item-info";
+
+      const title = document.createElement("h3");
+      title.textContent = `${perk.name} (Lv. ${lvl}/${maxLvl})`;
+
+      const desc = document.createElement("p");
+      if (lvl >= maxLvl) {
+        desc.textContent = `Current: +${currentBonus}${perk.unit} (Maxed)`;
+      } else {
+        const nextBonus = (lvl + 1) * perk.bonusPerLevel;
+        desc.textContent = `Current: +${currentBonus}${perk.unit} → Next: +${nextBonus}${perk.unit}`;
+      }
+
+      info.appendChild(title);
+      info.appendChild(desc);
+
+      const btn = document.createElement("button");
+      btn.className = "buy-btn";
+
+      if (lvl >= maxLvl) {
+        btn.textContent = "Maxed Out";
+        btn.disabled = true;
+      } else {
+        const cost = perk.costs[lvl];
+        btn.textContent = `Upgrade (${cost} Token${cost === 1 ? "" : "s"})`;
+        btn.disabled = availableTokens < cost;
+        btn.onclick = () => buyPerk(perk.id);
+      }
+
+      row.appendChild(info);
+      row.appendChild(btn);
+      listEl.appendChild(row);
+    }
   }
 
   // Updates the Shop UI button, price, and description
@@ -1229,6 +1488,118 @@
     document.getElementById("cardModal").classList.remove("active");
   }
 
+// Reward Package settings (5s fade in, 10s stay, 5s fade out = 20s total)
+  const PACKAGE_TOTAL_MS = 20 * 1000;
+  let activePackageEl = null;
+  let activePackageTimeout = null;
+
+  function showPackageToast(message) {
+    const existing = document.querySelector(".package-toast");
+    if (existing) existing.remove();
+
+    const toast = document.createElement("div");
+    toast.className = "package-toast";
+    toast.textContent = message;
+    document.body.appendChild(toast);
+
+    setTimeout(() => {
+      toast.remove();
+    }, 2600);
+  }
+
+  function clearActivePackage() {
+    if (activePackageTimeout) {
+      clearTimeout(activePackageTimeout);
+      activePackageTimeout = null;
+    }
+    if (activePackageEl) {
+      activePackageEl.remove();
+      activePackageEl = null;
+    }
+  }
+
+  function claimRewardPackage() {
+    if (!activePackageEl) return;
+    clearActivePackage();
+
+    const availablePackSpace = Math.max(0, maxPacks - queuedPacks);
+    const possibleRewards = ["coins", "xp"];
+    if (availablePackSpace > 0) {
+      possibleRewards.push("packs");
+    }
+
+    const chosenReward = possibleRewards[Math.floor(Math.random() * possibleRewards.length)];
+
+    if (chosenReward === "coins") {
+      const pct = 0.10 + Math.random() * 0.20; // 10% - 30%
+      const gainedCoins = Math.max(10, Math.ceil(coins * pct));
+      coins += gainedCoins;
+      showPackageToast(`📦 Package opened! +${gainedCoins.toLocaleString()} Coins`);
+    } else if (chosenReward === "xp") {
+      const levelInfo = getLevelInfo(xp);
+      const pct = 0.12 + Math.random() * 0.24; // 12% - 36% of next-level XP
+      const gainedXP = Math.max(15, Math.ceil(levelInfo.xpForNext * pct));
+      xp += gainedXP;
+      showPackageToast(`📦 Package opened! +${gainedXP.toLocaleString()} XP`);
+    } else {
+      const desiredPacks = Math.floor(Math.random() * 3) + 1; // 1 - 3
+      const gainedPacks = Math.min(desiredPacks, availablePackSpace);
+      queuedPacks += gainedPacks;
+      showPackageToast(`📦 Package opened! +${gainedPacks} Pack${gainedPacks > 1 ? "s" : ""}`);
+    }
+
+    saveState();
+    updateUI();
+  }
+
+  function spawnRewardPackage() {
+    // Only spawn if no package is currently on screen
+    if (activePackageEl) return;
+
+    const layer = document.getElementById("packageLayer");
+    const pkg = document.createElement("div");
+    pkg.className = "reward-package";
+    pkg.innerHTML = "📦";
+    pkg.title = "Click to open reward package!";
+
+    // Keep safely inside viewport edges (80px margin)
+    const maxX = Math.max(80, window.innerWidth - 150);
+    const maxY = Math.max(80, window.innerHeight - 150);
+    const randX = Math.floor(Math.random() * maxX) + 40;
+    const randY = Math.floor(Math.random() * maxY) + 40;
+
+    pkg.style.left = `${randX}px`;
+    pkg.style.top = `${randY}px`;
+    pkg.onclick = claimRewardPackage;
+
+    layer.appendChild(pkg);
+    activePackageEl = pkg;
+
+    activePackageTimeout = setTimeout(() => {
+      clearActivePackage();
+    }, PACKAGE_TOTAL_MS);
+  }
+
+  // package spawn (7:30-15:00 min)
+  function scheduleNextPackage() {
+    const baseDelayMs = (450 + Math.floor(Math.random() * 451)) * 1000;
+
+    const deliveryLvl = perkLevels.deliveryMastery || 0;
+    const deliveryMultiplier = Math.max(0.2, 1 - (deliveryLvl * 0.02));
+
+    const delayMs = Math.max(10000, Math.round(baseDelayMs * deliveryMultiplier));
+
+    setTimeout(() => {
+      spawnRewardPackage();
+      scheduleNextPackage();
+    }, delayMs);
+  }
+
+  setTimeout(() => {
+    spawnRewardPackage();
+    scheduleNextPackage();
+  }, 900000);
+
   // Updates coins, pack count, and queue generation timer every second
   function updateUI() {
     syncPackQueue();
@@ -1278,6 +1649,17 @@
 
     if (document.getElementById("tab-shop").style.display === "block") {
       renderShop();
+    }
+
+    const perkBadgeEl = document.getElementById("perkTokenBadge");
+    if (perkBadgeEl) {
+      const availableTokens = getAvailablePerkTokens();
+      perkBadgeEl.textContent = availableTokens.toLocaleString();
+      perkBadgeEl.classList.toggle("hidden", availableTokens <= 0);
+    }
+
+    if (document.getElementById("tab-progress")?.style.display === "block") {
+      renderPerks();
     }
   }
 
